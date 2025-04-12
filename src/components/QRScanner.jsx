@@ -18,10 +18,6 @@ function QRScanner() {
     return savedMode || 'camera';
   });
   const [scanning, setScanning] = useState(false);
-  const [cameraId, setCameraId] = useState(() => {
-    const savedCameraId = localStorage.getItem(STORAGE_KEYS.CAMERA_ID);
-    return savedCameraId || '';
-  });
   const [cameras, setCameras] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
@@ -43,10 +39,6 @@ function QRScanner() {
   }, [scanMode]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CAMERA_ID, cameraId);
-  }, [cameraId]);
-
-  useEffect(() => {
     if (result !== 'No result') {
       localStorage.setItem(STORAGE_KEYS.LAST_RESULT, result);
     }
@@ -60,7 +52,6 @@ function QRScanner() {
     Html5Qrcode.getCameras().then(devices => {
       if (mounted && devices && devices.length) {
         setCameras(devices);
-        setCameraId(devices[0].deviceId);
       }
     }).catch(err => {
       console.error('Error getting cameras', err);
@@ -73,12 +64,7 @@ function QRScanner() {
     };
   }, []);
 
-  const getCameraId = (cameras) => {
-    // If we have a saved camera ID and it exists in the available cameras, use it
-    if (cameraId && cameras.some(cam => cam.deviceId === cameraId)) {
-      return cameraId;
-    }
-
+  const getRearCameraId = (cameras) => {
     // Try to find the rear camera first (usually labeled as "back" or "environment")
     const rearCamera = cameras.find(cam => 
       cam.label.toLowerCase().includes('back') || 
@@ -114,12 +100,12 @@ function QRScanner() {
         aspectRatio: 1.0
       };
 
-      // Get the correct camera ID based on available cameras
+      // Get the rear camera ID
       const availableCameras = await Html5Qrcode.getCameras();
-      const selectedCameraId = getCameraId(availableCameras);
+      const rearCameraId = getRearCameraId(availableCameras);
 
       await scannerRef.current.start(
-        selectedCameraId ? { deviceId: selectedCameraId } : { facingMode: 'environment' },
+        rearCameraId ? { deviceId: rearCameraId } : { facingMode: 'environment' },
         config,
         (decodedText) => {
           setResult(decodedText);
@@ -202,18 +188,6 @@ function QRScanner() {
     processImage(file);
   };
   
-  const handleCameraChange = (e) => {
-    const newCameraId = e.target.value;
-    setCameraId(newCameraId);
-    
-    // If already scanning, restart with new camera
-    if (scanning) {
-      stopCameraScanner().then(() => {
-        startCameraScanner();
-      });
-    }
-  };
-
   const handleScanModeChange = async (mode) => {
     // Stop camera if it's running
     if (scanning) {
@@ -300,23 +274,6 @@ function QRScanner() {
       
       {scanMode === 'camera' && (
         <div className="scanner-section">
-          {cameras.length > 1 && (
-            <div className="camera-select">
-              <label htmlFor="camera-select">Select Camera: </label>
-              <select 
-                id="camera-select" 
-                onChange={handleCameraChange}
-                value={cameraId}
-              >
-                {cameras.map(camera => (
-                  <option key={camera.deviceId} value={camera.deviceId}>
-                    {camera.label || `Camera ${camera.deviceId}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          
           <div className="scanner-container">
             <div id="qr-reader" style={{ width: '100%', maxWidth: '400px', margin: '0 auto' }}></div>
             <div className="scanner-controls">
