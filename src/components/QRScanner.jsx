@@ -73,6 +73,27 @@ function QRScanner() {
     };
   }, []);
 
+  const getCameraId = (cameras) => {
+    // If we have a saved camera ID and it exists in the available cameras, use it
+    if (cameraId && cameras.some(cam => cam.deviceId === cameraId)) {
+      return cameraId;
+    }
+
+    // Try to find the rear camera first (usually labeled as "back" or "environment")
+    const rearCamera = cameras.find(cam => 
+      cam.label.toLowerCase().includes('back') || 
+      cam.label.toLowerCase().includes('rear') ||
+      cam.label.toLowerCase().includes('environment')
+    );
+
+    if (rearCamera) {
+      return rearCamera.deviceId;
+    }
+
+    // If no rear camera found, use the first available camera
+    return cameras[0]?.deviceId || '';
+  };
+
   const startCameraScanner = async () => {
     // Reset success state when starting a new scan
     setScanSuccess(false);
@@ -93,8 +114,12 @@ function QRScanner() {
         aspectRatio: 1.0
       };
 
+      // Get the correct camera ID based on available cameras
+      const availableCameras = await Html5Qrcode.getCameras();
+      const selectedCameraId = getCameraId(availableCameras);
+
       await scannerRef.current.start(
-        cameraId ? { deviceId: cameraId } : { facingMode: 'environment' },
+        selectedCameraId ? { deviceId: selectedCameraId } : { facingMode: 'environment' },
         config,
         (decodedText) => {
           setResult(decodedText);
